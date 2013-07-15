@@ -1,0 +1,5 @@
+Boston Globe (A to Z): http://www.boston.com/news/globe/a-z?mode=rss_10
+Boston Globe (Front Page): http://www.boston.com/news/globe/pageone?mode=rss_10
+Boston Globe (World): http://www.boston.com/news/globe/world?mode=rss_10
+Boston Globe (National): http://www.boston.com/news/globe/nation?mode=rss_10
+Boston Globe (Business): http://www.boston.com/news/globe/business?mode=rss_10

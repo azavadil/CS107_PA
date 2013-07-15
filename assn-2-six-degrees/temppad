@@ -1,0 +1,52 @@
+int numActors = *(int*)actorfile; 
+  /*we store aways the number of actors and then hop 
+   *over to get get to the start of the actor offsets*/ 
+  void* actorsBase = (char*)actorfile + 1*sizeof(int);
+  
+  void* actorRecord = bsearch(player, actorsBase, numActors, sizeof(int),nameCmp); 
+  
+  if ( actorRecord == NULL) return false; 
+  
+ 
+  /* calculations to determine the positions/offsets of the information
+   * we need to extract 
+   */ 
+
+  /* strlen does not include the terminating null character so we add 1*/  
+  int nameLen = strlen(player) + 1;  
+  /* the value is always padded to make it an even number (strlen doesn't about padding)
+   * if the length isn't even we increment by one for the padding we know must be there
+   */ 
+  if(nameLen % 2 != 0 )
+    nameLen++;
+
+  void* numMoviesPtr = (char*)actorRecord + nameLen*sizeof(char); 
+  short numMovies = *(short*)numMoviesPtr; 
+  
+  int prefixLen = nameLen + 2; 
+  if (prefixLen % 4 != 0) 
+    /* the prefix (i.e. the name and numMovies must take up space divisible by 4
+     * if the prefix is not divisible by 4, we increment prefix by 2 for the 
+     * padding we know must be there */ 
+    prefixLen = prefixLen + 2; 
+ 
+  void* creditsBase = (char*)actorRecord + prefixLen*sizeof(char); 
+  for (int i = 0; i < numMovies; i++){ 
+    void* offsetPtr = (char*)creditsBase + i*sizeof(int); 
+    int movieOffset = *(int*)offsetPtr; 
+    void* moviePtr = (char*)moviefile + movieOffset*sizeof(char); 
+    
+    char* titlePtr = strdup((char*)moviePtr); 
+    string movieTitle = *titlePtr; 
+    
+    /* adjust the length for the /0 padding not included in strlen*/ 
+    int movieTitleLen = strlen(movieTitle) + 1; 
+    /* movie year is stored a 1 byte char. We calculate the position 
+     * of the year, dereference, and cast to int (optional)*/ 
+    int movieYear = (int)*((char*)moviePtr + movieTitleLen*sizeof(char))
+    film curr; 
+    curr.title = movieTitle; curr.year = movieYear; 
+    films.push_back(curr); 
+  }			      
+
+  return true; 

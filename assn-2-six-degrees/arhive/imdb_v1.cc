@@ -1,0 +1,142 @@
+using namespace std;
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include "imdb.h"
+
+const char *const imdb::kActorFileName = "actordata";
+const char *const imdb::kMovieFileName = "moviedata";
+
+imdb::imdb(const string& directory)
+{
+  const string actorFileName = directory + "/" + kActorFileName;
+  const string movieFileName = directory + "/" + kMovieFileName;
+  
+  actorFile = acquireFileMap(actorFileName, actorInfo);
+  movieFile = acquireFileMap(movieFileName, movieInfo);
+  
+  actorFileStatic = actorFile; 
+
+}
+
+bool imdb::good() const
+{
+  return !( (actorInfo.fd == -1) || 
+	    (movieInfo.fd == -1) ); 
+}
+
+int imdb::nameCmp(const void *vp1, const void *vp2) { 
+  
+  /* the first arg is a referece to the search pair struct
+  *  we immediately cast to the type we know it is*/  
+  searchPair *sp = (searchPair*)vp1; 
+  /* we know pointers are 4 bytes and the 1st field of a search pair 
+   * is a pointer. We hop over the pointer to get the name field
+   */ 
+  const char *name1 = sp->playerName;  
+  /* the second arg is a pointer to an integer offset 
+   * we immediately cast to (int*) and dereference the offset
+   */ 
+  int offset = *(int*)vp2; 
+  /*using the offset we get a pointer to the actor record
+   *the first element of the record is the actor name*/ 
+  char *name2 = (char*)sp + offset*sizeof(char); 
+  return strcmp(name1, name2); 
+}
+
+// you should be implementing these two methods right here... 
+bool imdb::getCredits(const string& player, vector<film>& films) const { 
+   /* the first step is to use binary search to find the player record 
+   * in the actorfile
+   */ 
+  
+  /* binary search takes key, base, n, strike, and compareFunction*/ 
+  /* the first element of the data is a 4 byte integer 
+   * specifying the number of actors*/
+  int numActors = *(int*)actorFile; 
+  /*we store aways the number of actors and then hop 
+   *over to get get to the start of the actor offsets*/ 
+  void *actorsBase = (char*)actorFile + 1*sizeof(int);
+  
+  searchPair currPair; 
+  currPair.actorFilePtr = actorFile; 
+  const char *playerPtr = player.c_str(); 
+  currPair.playerName = playerPtr; 
+  
+  void *actorRecord = bsearch(&currPair, actorsBase, numActors, sizeof(int),nameCmp); 
+  
+  if ( actorRecord == NULL) return false; 
+  
+ 
+  /* calculations to determine the positions/offsets of the information
+   * we need to extract 
+   */ 
+
+  /* strlen does not include the terminating null character so we add 1*/  
+  int nameLen = strlen(player.c_str()) + 1;  
+  /* the value is always padded to make it an even number (strlen doesn't about padding)
+   * if the length isn't even we increment by one for the padding we know must be there
+   */ 
+  if(nameLen % 2 != 0 )
+    nameLen++;
+
+  void* numMoviesPtr = (char*)actorRecord + nameLen*sizeof(char); 
+  short numMovies = *(short*)numMoviesPtr; 
+  
+  int prefixLen = nameLen + 2; 
+  if (prefixLen % 4 != 0) 
+    /* the prefix (i.e. the name and numMovies must take up space divisible by 4
+     * if the prefix is not divisible by 4, we increment prefix by 2 for the 
+     * padding we know must be there */ 
+    prefixLen = prefixLen + 2; 
+ 
+  void *creditsBase = (char*)actorRecord + prefixLen*sizeof(char); 
+  for (int i = 0; i < numMovies; i++){ 
+    void *offsetPtr = (char*)creditsBase + i*sizeof(int); 
+    int movieOffset = *(int*)offsetPtr; 
+    void *moviePtr = (char*)movieFile + movieOffset*sizeof(char); 
+    
+    char *titlePtr = strdup((char*)moviePtr); 
+    string movieTitle(titlePtr); 
+    
+    /* adjust the length for the /0 padding not included in strlen*/ 
+    int movieTitleLen = strlen(movieTitle.c_str()) + 1; 
+    /* movie year is stored a 1 byte char. We calculate the position 
+     * of the year, dereference, and cast to int (optional)*/ 
+    int movieYear = (int)*((char*)moviePtr + movieTitleLen*sizeof(char));
+    film curr; 
+    curr.title = movieTitle; curr.year = movieYear; 
+    films.push_back(curr); 
+  }			      
+
+  return true; 
+  
+}
+
+
+bool imdb::getCast(const film& movie, vector<string>& players) const { return false; }
+
+imdb::~imdb()
+{
+  releaseFileMap(actorInfo);
+  releaseFileMap(movieInfo);
+}
+
+// ignore everything below... it's all UNIXy stuff in place to make a file look like
+// an array of bytes in RAM.. 
+const void *imdb::acquireFileMap(const string& fileName, struct fileInfo& info)
+{
+  struct stat stats;
+  stat(fileName.c_str(), &stats);
+  info.fileSize = stats.st_size;
+  info.fd = open(fileName.c_str(), O_RDONLY);
+  return info.fileMap = mmap(0, info.fileSize, PROT_READ, MAP_SHARED, info.fd, 0);
+}
+
+void imdb::releaseFileMap(struct fileInfo& info)
+{
+  if (info.fileMap != NULL) munmap((char *) info.fileMap, info.fileSize);
+  if (info.fd != -1) close(info.fd);
+}

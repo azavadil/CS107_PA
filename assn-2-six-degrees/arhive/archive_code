@@ -1,0 +1,18 @@
+  this is working
+  
+  void *testoutput = (char*)actorFile + 400000*sizeof(int); 
+  int myint = *(int*)testoutput; 
+  cout << "numActors, testoutput, myint: " << numActors << ", " << testoutput << ", " << myint << endl; 
+  
+  char *tempPtr = (char*)actorFile + myint*sizeof(char);
+  const char *myname = strdup(tempPtr); 
+  cout << myname << endl; 
+
+  
+  /* Note that it's trivial to convert a char* pointer to a string
+   * you can also use the string constructor string strtemp((char*)actorRecord)
+   */ 
+
+  string strtemp = (char*)actorRecord;
+  
+  string strtemp((char*)actorRecord)
